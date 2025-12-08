@@ -202,6 +202,85 @@ void renderOrbits(const glm::mat4& view, const glm::mat4& projection) {
 }
 
 // =====================================================
+// ФУНКЦИИ ДЛЯ ИНСТАНЦИРОВАННОГО РЕНДЕРИНГА
+// =====================================================
+
+void setupInstancedRendering() {
+    glGenVertexArrays(1, &instanceVAO);
+    glGenBuffers(1, &instanceVBO);
+
+    glBindVertexArray(instanceVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, planetModel.VBO);
+
+    // Position
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+                        sizeof(OBJVertex),
+                        (void*)offsetof(OBJVertex, position));
+    glEnableVertexAttribArray(0);
+
+    // TexCoord
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE,
+                        sizeof(OBJVertex),
+                        (void*)offsetof(OBJVertex, texCoord));
+    glEnableVertexAttribArray(1);
+
+    // Normal
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE,
+                        sizeof(OBJVertex),
+                        (void*)offsetof(OBJVertex, normal));
+    glEnableVertexAttribArray(2);
+
+    glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE,
+                        sizeof(glm::mat4),
+                        (void*)0);
+    glEnableVertexAttribArray(3);
+
+    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE,
+                        sizeof(glm::mat4),
+                        (void*)(sizeof(glm::vec4)));
+    glEnableVertexAttribArray(4);
+
+    glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE,
+                        sizeof(glm::mat4),
+                        (void*)(2 * sizeof(glm::vec4)));
+    glEnableVertexAttribArray(5);
+
+    glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE,
+                        sizeof(glm::mat4),
+                        (void*)(3 * sizeof(glm::vec4)));
+    glEnableVertexAttribArray(6);
+
+    glVertexAttribDivisor(3, 1);
+    glVertexAttribDivisor(4, 1);
+    glVertexAttribDivisor(5, 1);
+    glVertexAttribDivisor(6, 1);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, planetModel.EBO);
+
+    glBindVertexArray(0);
+}
+
+void updateInstanceBuffer() {
+    if (solarSystem == nullptr) return;
+
+    std::vector<glm::mat4> modelMatrices = solarSystem->getModelMatrices();
+    instanceCount = modelMatrices.size();
+
+    if (instanceCount == 0) return;
+
+    glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+    glBufferData(GL_ARRAY_BUFFER,
+                instanceCount * sizeof(glm::mat4),
+                modelMatrices.data(),
+                GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+
+// =====================================================
 // УПРАВЛЕНИЕ КАМЕРОЙ И ОРБИТАМИ
 // =====================================================
 
