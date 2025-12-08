@@ -29,7 +29,4 @@ private:
     void checkCompileErrors(GLuint shader, const std::string& type);
 };
 
-const char* orbitVertexShader;
-const char* orbitFragmentShader;
-
 #endif 

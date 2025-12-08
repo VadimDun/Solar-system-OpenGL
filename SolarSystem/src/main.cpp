@@ -398,6 +398,50 @@ void initModelsAndSystem() {
 }
 
 // =====================================================
+// ОСНОВНОЙ ЦИКЛ
+// =====================================================
+
+void render(float width, float height) {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glm::mat4 view = camera->getViewMatrix();
+    glm::mat4 projection = camera->getProjectionMatrix(width / height);
+
+    // 1. Рисуем орбиты 
+    renderOrbits(view, projection);
+
+    // 2. Рисуем планеты
+    if (!instancedShader) return;
+
+    instancedShader->use();
+
+    // Позиция света (Солнце)
+    glm::vec3 lightPos = glm::vec3(0.0f, 0.0f, 0.0f);
+
+    instancedShader->setMat4("view", view);
+    instancedShader->setMat4("projection", projection);
+    instancedShader->setVec3("lightPos", lightPos);
+
+    updateInstanceBuffer();
+
+    // Рисуем все инстансы за один вызов
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, planetTexture);
+    instancedShader->setInt("textureSampler", 0);
+
+    glBindVertexArray(instanceVAO);
+    glDrawElementsInstanced(GL_TRIANGLES,
+                           planetModel.indexCount,
+                           GL_UNSIGNED_INT,
+                           0,
+                           instanceCount);
+    glBindVertexArray(0);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glUseProgram(0);
+}
+
+// =====================================================
 // УПРАВЛЕНИЕ КАМЕРОЙ И ОРБИТАМИ
 // =====================================================
 
@@ -470,79 +514,88 @@ void handleInput(sf::Window& window, float deltaTime) {
 }
 
 int main() {
-    setlocale(LC_ALL, "ru");
+    sf::ContextSettings settings;
+    settings.depthBits = 24;
+    settings.stencilBits = 8;
+    settings.antialiasingLevel = 4;
+    settings.majorVersion = 3;
+    settings.minorVersion = 3;
+    settings.attributeFlags = sf::ContextSettings::Core;
 
-    sf::Window window(sf::VideoMode(900, 900), "OpenGL Assignments", sf::Style::Default, sf::ContextSettings(32));
-
+    sf::RenderWindow window(sf::VideoMode(1200, 800), "Solar System - Инстанцированный рендеринг",
+                           sf::Style::Default, settings);
     window.setVerticalSyncEnabled(true);
     window.setActive(true);
 
-    GLenum glewInitResult = glewInit();
-    if (glewInitResult != GLEW_OK) {
-        std::cerr << "GLEW initialization error: " << glewGetErrorString(glewInitResult) << std::endl;
+    glewExperimental = GL_TRUE;
+    if (glewInit() != GLEW_OK) {
+        std::cerr << "Ошибка инициализации GLEW" << std::endl;
         return -1;
     }
 
-    if (!GLEW_VERSION_3_3) {
-        std::cerr << "OpenGL 3.3 not supported!" << std::endl;
-        return -1;
-    }
+    std::cout << "=== СОЛНЕЧНАЯ СИСТЕМА ===" << std::endl;
+    std::cout << std::endl;
 
-    std::cout << "OpenGL version: " << glGetString(GL_VERSION) << std::endl;
-    std::cout << "GLSL version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
-    std::cout << "\nТекущая фигура 1: Градиентный тетраэдр" << std::endl;
-    std::cout << "# Управление: стрелки - перемещение по X/Y, W/S - перемещение по Z\n" << std::endl;
+    initGL();
+    initShaders();
+    initModelsAndSystem();
+    camera = new Camera(glm::vec3(0.0f, 10.0f, 30.0f));
 
-    Init();
+    std::cout << std::endl;
+    std::cout << "  УПРАВЛЕНИЕ:" << std::endl;
+    std::cout << "  W/A/S/D - движение вперёд/назад/влево/вправо" << std::endl;
+    std::cout << "  SPACE/CTRL - движение вверх/вниз" << std::endl;
+    std::cout << "  СТРЕЛКИ - повороты камеры" << std::endl;
+    std::cout << "  O - показать/скрыть орбиты" << std::endl;
+    std::cout << "  R - сбросить камеру в начальную позицию" << std::endl;
+    std::cout << "  ESC - выход" << std::endl;
+    std::cout << std::endl;
 
-    while (window.isOpen()) {
+    sf::Clock clock;
+    bool running = true;
+    float frameTime = 0.0f;
+    int frameCount = 0;
+
+    while (running && window.isOpen()) {
         sf::Event event;
-
         while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed) {
-                window.close();
+            if (event.type == sf::Event::Closed ||
+                (event.type == sf::Event::KeyPressed &&
+                 event.key.code == sf::Keyboard::Escape)) {
+                running = false;
             }
-            else if (event.type == sf::Event::Resized) {
+            
+            if (event.type == sf::Event::Resized) {
                 glViewport(0, 0, event.size.width, event.size.height);
-            }
-            else if (event.type == sf::Event::KeyPressed) {
-                //if (event.key.code == sf::Keyboard::Num1) {
-                //    Release();
-                //    currentAssignment = ASSIGNMENT_1;
-                //    Init();
-                //    std::cout << "Текущая фигура 1: Градиентный тетраэдр" << std::endl;
-                //    std::cout << "# Управление: стрелки - перемещение по X/Y, W/S - перемещение по Z\n" << std::endl;
-                //}
-                //else if (event.key.code == sf::Keyboard::Num2) {
-                //    Release();
-                //    currentAssignment = ASSIGNMENT_2;
-                //    Init();
-                //    std::cout << "Текущая фигура 2: Кубик с наложенной на него текстурой\n" << std::endl;
-                //}
-                //else if (event.key.code == sf::Keyboard::Num3) {
-                //    Release();
-                //    currentAssignment = ASSIGNMENT_3;
-                //    Init();
-                //    std::cout << "Текущая фигура 3: Кубик с двумя смешанными текстурами\n" << std::endl;
-                //}
-                //else if (event.key.code == sf::Keyboard::Num4) {
-                //    Release();
-                //    currentAssignment = ASSIGNMENT_4;
-                //    Init();
-                //    std::cout << "Текущая фигура 4: Градиентный круг" << std::endl;
-                //     std::cout << "# Управление: W/S - перемещение по Y, A/D - перемещение по X\n" << std::endl;
-                //}
             }
         }
 
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        float deltaTime = clock.restart().asSeconds();
+        frameTime += deltaTime;
+        frameCount++;
 
-        Draw();
+        handleInput(window, deltaTime);
+        solarSystem->update(deltaTime * 10.0f);
+
+        render(window.getSize().x, window.getSize().y);
 
         window.display();
     }
 
-    Release();
+    delete instancedShader;
+    delete camera;
+    delete solarSystem;
+    glDeleteTextures(1, &sunTexture);
+    glDeleteTextures(1, &planetTexture);
+    glDeleteBuffers(1, &instanceVBO);
+    glDeleteVertexArrays(1, &instanceVAO);
+    
+    glDeleteProgram(orbitShaderProgram);
+    glDeleteBuffers(1, &orbitVBO);
+    glDeleteVertexArrays(1, &orbitVAO);
+
+    window.close();
+    std::cout << "✅ Программа завершена" << std::endl;
+
     return 0;
 }

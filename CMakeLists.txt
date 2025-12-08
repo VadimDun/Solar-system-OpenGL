@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(3DObjects)
+project(SolarSystem)
 
 # ============================================================================
 # C++ Standard
@@ -22,77 +22,126 @@ find_package(glm REQUIRED)
 find_package(SFML 2.6 COMPONENTS graphics window system REQUIRED)
 
 # ============================================================================
-# Project Structure
+# Project Structure - Солнечная система
 # ============================================================================
 set(SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/3d-objects/main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/3d-objects/shader.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/3d-objects/tetrahedron.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/3d-objects/cube1.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/3d-objects/cube2.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/3d-objects/circle.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SolarSystem/src/main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SolarSystem/src/camera.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SolarSystem/src/shader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SolarSystem/src/solar_system.cpp
 )
 
 set(HEADERS
-    ${CMAKE_CURRENT_SOURCE_DIR}/3d-objects/shader.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/SolarSystem/include/camera.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/SolarSystem/include/shader.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/SolarSystem/include/obj_loader.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/SolarSystem/include/solar_system.h
 )
+
+# ============================================================================
+# Проверка существования файлов
+# ============================================================================
+foreach(src ${SOURCES})
+    if(NOT EXISTS ${src})
+        message(WARNING "Файл не найден: ${src}")
+    else()
+        message(STATUS "✓ Найден: ${src}")
+    endif()
+endforeach()
 
 # ============================================================================
 # Create Executable
 # ============================================================================
-add_executable(lab12 ${SOURCES} ${HEADERS})
+add_executable(SolarSystem ${SOURCES} ${HEADERS})
+
+# ============================================================================
+# Include Directories
+# ============================================================================
+target_include_directories(SolarSystem 
+    PRIVATE 
+        ${CMAKE_CURRENT_SOURCE_DIR}/SolarSystem/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/SolarSystem/src
+        ${OPENGL_INCLUDE_DIR}
+        ${GLEW_INCLUDE_DIRS}
+        ${GLM_INCLUDE_DIRS}
+        ${SFML_INCLUDE_DIR}
+)
 
 # ============================================================================
 # Link Libraries
 # ============================================================================
-target_link_libraries(lab12 
+target_link_libraries(SolarSystem 
     PRIVATE
         OpenGL::OpenGL           # OpenGL 3.3
         GLEW::GLEW               # GLEW для загрузки функций
         glm::glm                 # GLM для матричных операций
-        sfml-graphics            # SFML Graphics
+        sfml-graphics            # SFML Graphics (для Image)
         sfml-window              # SFML Window (OpenGL контекст)
         sfml-system              # SFML System
 )
 
 # ============================================================================
-# Include Directories
-# ============================================================================
-target_include_directories(lab12 
-    PRIVATE 
-        ${CMAKE_CURRENT_SOURCE_DIR}/3d-objects
-        ${OPENGL_INCLUDE_DIR}
-        ${GLEW_INCLUDE_DIRS}
-        ${GLM_INCLUDE_DIRS}
-)
-
-# ============================================================================
-# Compiler Flags for Different Configurations
+# Compiler Flags
 # ============================================================================
 if(MSVC)
-    target_compile_options(lab12 PRIVATE /W4)
+    target_compile_options(SolarSystem PRIVATE /W4)
 else()
-    target_compile_options(lab12 PRIVATE -Wall -Wextra -pedantic)
+    target_compile_options(SolarSystem PRIVATE -Wall -Wextra -pedantic)
 endif()
 
 # ============================================================================
-# Build Output - Исполняемый файл в папке build
+# Build Output - Исполняемый файл в папке build/bin
 # ============================================================================
-set_target_properties(lab12 PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+set_target_properties(SolarSystem PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin"
+)
+
+# ============================================================================
+# ИСПРАВЛЕННО: Копирование моделей и текстур
+# ============================================================================
+# ВАЖНО: Создаем директории ПЕРЕД копированием!
+add_custom_command(TARGET SolarSystem PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        "${CMAKE_CURRENT_BINARY_DIR}/bin/models"
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        "${CMAKE_CURRENT_BINARY_DIR}/bin/textures"
+    COMMENT "📁 Создаём директории для моделей и текстур..."
+)
+
+# ============================================================================
+# Копируем модель fish.obj
+# ============================================================================
+add_custom_command(TARGET SolarSystem POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/SolarSystem/models/fish.obj"
+        "${CMAKE_CURRENT_BINARY_DIR}/bin/models/fish.obj"
+    COMMENT "📦 Копирую fish.obj..."
+)
+
+# ============================================================================
+# Копируем текстуру fish.png
+# ============================================================================
+add_custom_command(TARGET SolarSystem POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/SolarSystem/textures/fish.png"
+        "${CMAKE_CURRENT_BINARY_DIR}/bin/textures/fish.png"
+    COMMENT "🎨 Копирую fish.png..."
 )
 
 # ============================================================================
 # Version Information
 # ============================================================================
 message(STATUS "")
-message(STATUS "========== 3D Objects Configuration ==========")
+message(STATUS "========== Solar System Configuration ==========")
+message(STATUS "Project: Solar System")
 message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "OpenGL Version: ${OPENGL_VERSION_STRING}")
 message(STATUS "GLEW Version: ${GLEW_VERSION}")
 message(STATUS "SFML Version: ${SFML_VERSION}")
 message(STATUS "GLM Version: ${GLM_VERSION}")
 message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "Output Directory: ${CMAKE_CURRENT_BINARY_DIR}")
-message(STATUS "=============================================")
+message(STATUS "Output Directory: ${CMAKE_CURRENT_BINARY_DIR}/bin")
+message(STATUS "Models Directory: ${CMAKE_CURRENT_SOURCE_DIR}/SolarSystem/models")
+message(STATUS "Textures Directory: ${CMAKE_CURRENT_SOURCE_DIR}/SolarSystem/textures")
+message(STATUS "================================================")
 message(STATUS "")
