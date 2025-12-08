@@ -3,6 +3,78 @@
 #include <GL/glew.h>
 #include "shader.h"
 
+// =====================================================
+// УПРАВЛЕНИЕ КАМЕРОЙ И ОРБИТАМИ
+// =====================================================
+
+void handleInput(sf::Window& window, float deltaTime) {
+    float moveSpeed = 5.0f * deltaTime;
+    float rotateSpeed = 50.0f * deltaTime;
+
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
+        camera->moveForward(moveSpeed);
+    }
+
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
+        camera->moveBackward(moveSpeed);
+    }
+
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
+        camera->moveLeft(moveSpeed);
+    }
+
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
+        camera->moveRight(moveSpeed);
+    }
+
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space)) {
+        camera->moveUp(moveSpeed);
+    }
+
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::LControl)) {
+        camera->moveDown(moveSpeed);
+    }
+
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up)) {
+        camera->rotatePitch(rotateSpeed);  
+    }
+
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down)) {
+        camera->rotatePitch(-rotateSpeed);
+    }
+
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) {
+        camera->rotateYaw(-rotateSpeed);
+    }
+
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) {
+        camera->rotateYaw(rotateSpeed);
+    }
+
+    static bool oKeyPressed = false;
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::O)) {
+        if (!oKeyPressed) {
+            showOrbits = !showOrbits;
+            std::cout << "Орбиты: " << (showOrbits ? "ВКЛ" : "ВЫКЛ") << std::endl;
+            oKeyPressed = true;
+        }
+    } else {
+        oKeyPressed = false;
+    }
+
+    static bool rKeyPressed = false;
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::R)) {
+        if (!rKeyPressed) {
+            delete camera;
+            camera = new Camera(glm::vec3(0.0f, 10.0f, 30.0f));
+            std::cout << "Камера сброшена в начальную позицию" << std::endl;
+            rKeyPressed = true;
+        }
+    } else {
+        rKeyPressed = false;
+    }
+}
+
 int main() {
     setlocale(LC_ALL, "ru");
 
