@@ -279,6 +279,123 @@ void updateInstanceBuffer() {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
+// =====================================================
+// ИНИЦИАЛИЗАЦИЯ
+// =====================================================
+
+void initGL() {
+    glClearColor(66.0f / 255.0f, 133.0f / 255.0f, 180.0f / 255.0f, 1.0f);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+
+    std::cout << " OpenGL инициализирован" << std::endl;
+    std::cout << "  Версия: " << glGetString(GL_VERSION) << std::endl;
+    std::cout << "  Vendor: " << glGetString(GL_VENDOR) << std::endl;
+}
+
+void initShaders() {
+    instancedShader = new InstancedShader();
+    std::cout << "Инстанцированные шейдеры скомпилированы" << std::endl;    
+    initOrbitShader();
+}
+
+GLuint loadSimpleTexture(const std::string& filename) {
+    sf::Image image;
+    if (image.loadFromFile(filename)) {
+        image.flipVertically();
+        GLuint texture;
+        glGenTextures(1, &texture);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+        sf::Vector2u size = image.getSize();
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                    size.x, size.y,
+                    0, GL_RGBA, GL_UNSIGNED_BYTE, image.getPixelsPtr());
+        glGenerateMipmap(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        std::cout << "Текстура загружена: " << filename << std::endl;
+        return texture;
+    }
+
+    std::cout << "Использую fallback текстуру для: " << filename << std::endl;
+    GLuint texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    unsigned char data[4 * 4 * 3];
+    for (int i = 0; i < 4 * 4 * 3; i += 3) {
+        if (filename.find("sun") != std::string::npos) {
+            data[i] = 255;
+            data[i+1] = 200; 
+            data[i+2] = 0;   
+        } else {
+            data[i] = 100 + rand() % 156;
+            data[i+1] = 100 + rand() % 156;
+            data[i+2] = 100 + rand() % 156;
+        }
+    }
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 4, 4, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    return texture;
+}
+
+void initModelsAndSystem() {
+    if (!planetModel.load("models/fish.obj")) {
+        std::cerr << "Ошибка загрузки модели планеты" << std::endl;
+    } else {
+        std::cout << "Модель планеты загружена: "
+                  << planetModel.vertices.size() << " вершин, "
+                  << planetModel.indices.size() << " индексов" << std::endl;
+    }
+
+    sunTexture = loadSimpleTexture("textures/fish.jpg");
+    planetTexture = loadSimpleTexture("textures/fish.png");
+
+    setupInstancedRendering();
+
+    solarSystem = new SolarSystem();
+
+
+    CelestialBody sun;
+    sun.orbitRadius = 0.0f;
+    sun.orbitSpeed = 0.0f;
+    sun.rotationSpeed = 0.5f;
+    sun.scale = 15.0f;
+    sun.orbitCenter = glm::vec3(0.0f, 0.0f, 0.0f);
+    solarSystem->addBody(sun);
+
+    float radii[] = {4.0f, 6.0f, 8.0f, 10.0f, 13.0f, 16.0f};
+    float speeds[] = {3.0f, 2.0f, 1.5f, 1.2f, 0.8f, 0.5f};
+    float rotations[] = {4.0f, 3.0f, 2.5f, 2.0f, 1.5f, 1.0f};
+    float scales[] = {5.3f, 5.1f, 5.6f, 6.4f, 4.2f, 4.8f};
+
+    for (int i = 0; i < 6; i++) {
+        CelestialBody planet;
+        planet.orbitRadius = radii[i];
+        planet.orbitSpeed = speeds[i];
+        planet.rotationSpeed = rotations[i];
+        planet.scale = scales[i];
+        planet.orbitCenter = glm::vec3(0.0f, 0.0f, 0.0f);
+        solarSystem->addBody(planet);
+    }
+
+    std::cout << "Солнечная система инициализирована (" << solarSystem->getBodyCount() << " объектов)" << std::endl;
+
+    updateInstanceBuffer();    
+    initOrbits();
+}
 
 // =====================================================
 // УПРАВЛЕНИЕ КАМЕРОЙ И ОРБИТАМИ
