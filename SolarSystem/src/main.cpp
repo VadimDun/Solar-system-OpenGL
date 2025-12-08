@@ -1,7 +1,205 @@
-#include <iostream>
-#include <SFML/Window.hpp>
 #include <GL/glew.h>
+#include <SFML/Window.hpp>
+#include <SFML/Graphics.hpp>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <iostream>
+
 #include "shader.h"
+#include "obj_loader.h"
+#include "camera.h"
+#include "solar_system.h"
+
+// =====================================================
+// ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ ОРБИТ
+// =====================================================
+
+GLuint orbitShaderProgram = 0;
+GLuint orbitVAO = 0, orbitVBO = 0;
+std::vector<float> orbitVertices;
+std::vector<glm::vec3> orbitColors;
+std::vector<int> orbitSegmentStarts;
+std::vector<int> orbitSegmentCounts;
+bool showOrbits = true;
+
+// =====================================================
+// ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ ИНСТАНЦИРОВАНИЯ
+// =====================================================
+
+OBJModel planetModel;              
+InstancedShader* instancedShader = nullptr;
+Camera* camera = nullptr;
+SolarSystem* solarSystem = nullptr;
+
+GLuint sunTexture = 0;
+GLuint planetTexture = 0;
+
+GLuint instanceVBO = 0;
+GLuint instanceVAO = 0;
+size_t instanceCount = 0;
+
+// =====================================================
+// ФУНКЦИИ ДЛЯ ОРБИТ
+// =====================================================
+
+std::vector<float> createOrbitCircle(float radius, int segments = 100) {
+    std::vector<float> vertices;
+    for (int i = 0; i <= segments; i++) {
+        float angle = (i / (float)segments) * 2.0f * 3.14159265f;
+        vertices.push_back(radius * std::cos(angle));  
+        vertices.push_back(0.0f);                      
+        vertices.push_back(radius * std::sin(angle));  
+    }
+    return vertices;
+}
+
+void initOrbitShader() {
+    const char* orbitVertexShader = R"(
+        #version 330 core
+        layout(location = 0) in vec3 position;
+        
+        uniform mat4 view;
+        uniform mat4 projection;
+        
+        void main() {
+            gl_Position = projection * view * vec4(position, 1.0);
+        }
+    )";
+    
+    const char* orbitFragmentShader = R"(
+        #version 330 core
+        uniform vec3 color;
+        out vec4 FragColor;
+        
+        void main() {
+            FragColor = vec4(color, 1.0);
+        }
+    )";
+    
+    GLuint vertex = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertex, 1, &orbitVertexShader, NULL);
+    glCompileShader(vertex);
+    
+    int success;
+    char infoLog[512];
+    glGetShaderiv(vertex, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        glGetShaderInfoLog(vertex, 512, NULL, infoLog);
+        std::cerr << "Ошибка компиляции вертексного шейдера орбит:\n" << infoLog << std::endl;
+    }
+    
+    GLuint fragment = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragment, 1, &orbitFragmentShader, NULL);
+    glCompileShader(fragment);
+    
+    glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        glGetShaderInfoLog(fragment, 512, NULL, infoLog);
+        std::cerr << "Ошибка компиляции фрагментного шейдера орбит:\n" << infoLog << std::endl;
+    }
+    
+    orbitShaderProgram = glCreateProgram();
+    glAttachShader(orbitShaderProgram, vertex);
+    glAttachShader(orbitShaderProgram, fragment);
+    glLinkProgram(orbitShaderProgram);
+    
+    glGetProgramiv(orbitShaderProgram, GL_LINK_STATUS, &success);
+    if (!success) {
+        glGetProgramInfoLog(orbitShaderProgram, 512, NULL, infoLog);
+        std::cerr << "Ошибка линковки шейдера орбит:\n" << infoLog << std::endl;
+    }
+    
+    glDeleteShader(vertex);
+    glDeleteShader(fragment);
+    
+    std::cout << "Шейдер для орбит скомпилирован" << std::endl;
+}
+
+void initOrbits() {
+    if (!solarSystem) return;
+    
+    const auto& bodies = solarSystem->getBodies();
+    
+    std::vector<glm::vec3> colors = {
+        glm::vec3(1.0f, 0.5f, 0.0f),  
+        glm::vec3(0.0f, 0.8f, 1.0f),  
+        glm::vec3(0.0f, 1.0f, 0.5f),  
+        glm::vec3(1.0f, 0.0f, 0.5f),  
+        glm::vec3(0.5f, 0.0f, 1.0f),  
+        glm::vec3(1.0f, 1.0f, 0.0f),  
+        glm::vec3(1.0f, 0.8f, 0.0f),  
+    };
+    
+    for (size_t i = 1; i < bodies.size(); i++) {  
+        const auto& body = bodies[i];
+        if (body.orbitRadius > 0.0f) {
+            auto circleVertices = createOrbitCircle(body.orbitRadius);
+            
+            orbitSegmentStarts.push_back(orbitVertices.size() / 3);  
+            orbitSegmentCounts.push_back(circleVertices.size() / 3); 
+            
+            orbitVertices.insert(orbitVertices.end(), 
+                                circleVertices.begin(), 
+                                circleVertices.end());
+            
+            int colorIndex = (i - 1) % colors.size();
+            orbitColors.push_back(colors[colorIndex]);
+        }
+    }
+    
+    if (!orbitVertices.empty()) {
+        glGenVertexArrays(1, &orbitVAO);
+        glGenBuffers(1, &orbitVBO);
+        
+        glBindVertexArray(orbitVAO);
+        
+        glBindBuffer(GL_ARRAY_BUFFER, orbitVBO);
+        glBufferData(GL_ARRAY_BUFFER, 
+                    orbitVertices.size() * sizeof(float),
+                    orbitVertices.data(),
+                    GL_STATIC_DRAW);
+        
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 
+                            3 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+    }
+}
+
+void renderOrbits(const glm::mat4& view, const glm::mat4& projection) {
+    if (!showOrbits || orbitVAO == 0 || orbitShaderProgram == 0) return;
+    
+    glUseProgram(orbitShaderProgram);
+    
+    GLint viewLoc = glGetUniformLocation(orbitShaderProgram, "view");
+    GLint projLoc = glGetUniformLocation(orbitShaderProgram, "projection");
+    GLint colorLoc = glGetUniformLocation(orbitShaderProgram, "color");
+    
+    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+    
+    glDisable(GL_DEPTH_TEST);
+    
+    glLineWidth(1.5f);
+    
+    glBindVertexArray(orbitVAO);
+    
+    for (size_t i = 0; i < orbitSegmentStarts.size(); i++) {
+        glUniform3fv(colorLoc, 1, glm::value_ptr(orbitColors[i]));
+        glDrawArrays(GL_LINE_STRIP, 
+                    orbitSegmentStarts[i], 
+                    orbitSegmentCounts[i]);
+    }
+    
+    glBindVertexArray(0);
+    
+    glLineWidth(1.0f);
+    glEnable(GL_DEPTH_TEST);
+    glUseProgram(0);
+}
 
 // =====================================================
 // УПРАВЛЕНИЕ КАМЕРОЙ И ОРБИТАМИ
