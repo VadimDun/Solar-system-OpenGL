@@ -54,29 +54,7 @@ std::vector<float> createOrbitCircle(float radius, int segments = 100) {
     return vertices;
 }
 
-void initOrbitShader() {
-    const char* orbitVertexShader = R"(
-        #version 330 core
-        layout(location = 0) in vec3 position;
-        
-        uniform mat4 view;
-        uniform mat4 projection;
-        
-        void main() {
-            gl_Position = projection * view * vec4(position, 1.0);
-        }
-    )";
-    
-    const char* orbitFragmentShader = R"(
-        #version 330 core
-        uniform vec3 color;
-        out vec4 FragColor;
-        
-        void main() {
-            FragColor = vec4(color, 1.0);
-        }
-    )";
-    
+void initOrbitShader() {  
     GLuint vertex = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertex, 1, &orbitVertexShader, NULL);
     glCompileShader(vertex);
@@ -360,7 +338,7 @@ void initModelsAndSystem() {
                   << planetModel.indices.size() << " индексов" << std::endl;
     }
 
-    sunTexture = loadSimpleTexture("textures/fish.jpg");
+    sunTexture = loadSimpleTexture("textures/fish.png");
     planetTexture = loadSimpleTexture("textures/fish.png");
 
     setupInstancedRendering();
@@ -445,7 +423,7 @@ void render(float width, float height) {
 // УПРАВЛЕНИЕ КАМЕРОЙ И ОРБИТАМИ
 // =====================================================
 
-void handleInput(sf::Window& window, float deltaTime) {
+void handleInput(float deltaTime) {
     float moveSpeed = 5.0f * deltaTime;
     float rotateSpeed = 50.0f * deltaTime;
 
@@ -574,7 +552,7 @@ int main() {
         frameTime += deltaTime;
         frameCount++;
 
-        handleInput(window, deltaTime);
+        handleInput(deltaTime);
         solarSystem->update(deltaTime * 10.0f);
 
         render(window.getSize().x, window.getSize().y);
