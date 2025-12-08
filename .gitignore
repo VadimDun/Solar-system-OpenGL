@@ -5,7 +5,7 @@
 *.slo
 *.lo
 *.o
-*.obj
+# *.obj
 
 # Precompiled Headers
 *.gch
@@ -53,7 +53,7 @@ tegra/
 bin/
 *.sdf
 *.opensdf
-*.obj
+# *.obj
 *.stamp
 *.depend
 *.rule
